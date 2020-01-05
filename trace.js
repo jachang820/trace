@@ -267,60 +267,88 @@ reactsStub = {
 	]
 };
 
+trace.isTextNode = function(node) {
+	return node.nodeType == Node.TEXT_NODE;
+};
+
 trace.isMarked = function(node) {
-	if (node.nodeType == Node.TEXT_NODE) {
+	if (trace.isTextNode(node)) {
 		node = node.parentElement;
 	}
 	return node.classList.contains(trace.class.marked);
 };
 
 trace.isExcluded = function(node) {
-	if (node.nodeType == Node.TEXT_NODE) {
+	if (trace.isTextNode(node)) {
 		node = node.parentElement;
 	}
 	return node.classList.contains(trace.class.exclude);
-}
+};
 
-trace.removeExcludedFromRange = function(range) {
-	let endNode = range.endContainer;
-	if (trace.isExcluded(endNode)) {
-		let parent = endNode.parentNode;
-		while (trace.isExcluded(parent)) {
-			endNode = parent;
-			parent = endNode.parentNode;
-		}
-		endNode = trace.findPreviousTextNode(endNode);
-		range.setEnd(endNode, endNode.textContent.length);
-	}
-}
+trace.textExists = function(text) {
+	return text && /\S/.test(text);
+};
 
-trace.findPreviousTextNode = function(node) {
-	node = node.previousSibling;
-	while (node.nodeType != Node.TEXT_NODE) {
-		if (node.textContent.trim().length > 0 && !trace.isExcluded(node)) {
-			node = node.lastChild;
-		} else if (node.previousSibling) {
-			node = node.previousSibling;
-		} else {
-			break;
-		}
+trace.validParent = function(node) {
+	return !trace.isTextNode(node) && !trace.isExcluded(node);
+};
+
+trace.findChildTextNode = function(node, first=true) {
+	let text = node.textContent;
+	while (trace.validParent(node) && trace.textExists(text)) {
+		node = (first ? node.firstChild : node.lastChild);
+		text = node.textContent;
 	}
 	return node;
 };
 
-trace.findRootNode = function(node) {
-	while (node.parentNode != trace.element) {
+trace.findAdjacentTextNode = function(node, after=true) {
+	if (trace.isTextNode(node)) {
 		node = node.parentNode;
+	}
+	let nextNode = (after ? "nextSibling" : "previousSibling");
+	while (!trace.isTextNode(node)) {
+		if (node[nextNode]) {
+			node = trace.findChildTextNode(node[nextNode], after);
+		} else if (node === trace.element) {
+			return null;
+		} else {
+			node = node.parentNode;
+		}
 	}
 	return node;
 };
 
 trace.trimWSFromRange = function(range) {
-	// How to deal with spaces between 2 marks?
+	let node = range.startContainer;
+	let text = node.textContent;
+	let offset = range.startOffset;
+	if (text && text.substring(offset)) {
+		while (offset < text.length && /^\s$/.test(text[offset])) {
+			offset++;
+		}
+		if (offset < text.length) {
+			range.setStart(node, offset);
+		}
+	} else {
+		node = trace.findAdjacentTextNode(node);
+		let beforeEnd = false;
+		if (node) {
+			let nodeRange = document.createRange();
+			nodeRange.selectNode(node);
+			if (nodeRange.compareBoundaryPoints(Range.END_TO_END, range) < 1) {
+				beforeEnd = true;
+			}
+		} 
+		if (!beforeEnd) {
+			range.collapse();
+			return false;
+		}
+	}
 };
 
 trace.endRangeAtEndOfTextNode = function(range, node) {
-	if (node.nodeType == Node.TEXT_NODE) {
+	if (trace.isTextNode(node)) {
 		range.setEnd(node, node.textContent.length);
 		return true;
 	} else {
@@ -330,7 +358,7 @@ trace.endRangeAtEndOfTextNode = function(range, node) {
 };
 
 trace.startRangeAtStartOfTextNode = function(range, node) {
-	if (node.nodeType == Node.TEXT_NODE) {
+	if (trace.isTextNode(node)) {
 		range.setStart(node, 0);
 		return true;
 	} else {
@@ -339,12 +367,24 @@ trace.startRangeAtStartOfTextNode = function(range, node) {
 	}
 };
 
+trace.removeExcludedFromRange = function(range) {
+	let endNode = range.endContainer;
+	if (trace.isExcluded(endNode)) {
+		let parent = endNode.parentNode;
+		while (trace.isExcluded(parent)) {
+			endNode = parent;
+			parent = endNode.parentNode;
+		}
+		endNode = trace.findAdjacentTextNode(endNode, after=false);
+		range.setEnd(endNode, endNode.textContent.length);
+	}
+};
+
 trace.spliceMarkedNodes = function(range) {
 	let startNode = range.startContainer;
 	let endNode = range.endContainer;
 	if (trace.isMarked(endNode)) {
-		endNode = trace.findPreviousTextNode(
-			trace.findRootNode(endNode));
+		endNode = trace.findAdjacentTextNode(endNode.parentNode, after=false);
 	} else if (range.endOffset < endNode.textContent.length) {
 		endNode = endNode.splitText(range.endOffset).previousSibling;
 	}
