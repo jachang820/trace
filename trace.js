@@ -285,10 +285,6 @@ trace.isExcluded = function(node) {
 	return node.classList.contains(trace.class.exclude);
 };
 
-trace.textExists = function(text) {
-	return text && /\S/.test(text);
-};
-
 trace.validParent = function(node) {
 	return !trace.isTextNode(node) && !trace.isExcluded(node);
 };
@@ -296,7 +292,7 @@ trace.validParent = function(node) {
 trace._findChildTextNode = function(node, reversed) {
 	const child = reversed ? "lastChild" : "firstChild";
 	let text = node.textContent;
-	while (trace.validParent(node) && trace.textExists(text)) {
+	while (trace.validParent(node) && text.trim()) {
 		node = node[child];
 		text = node.textContent;
 	}
@@ -518,7 +514,7 @@ trace.spliceMarkedNodes = function(range) {
 	}
 };
 
-trace.markedNodesIterator = function(range) {
+trace.rangedNodesIterator = function(range) {
 	let startReached, endReached;
 	return document.createNodeIterator(
 		range.commonAncestorContainer,
@@ -540,8 +536,14 @@ trace.markedNodesIterator = function(range) {
 };
 
 trace._markIsAdjacent = function(node, precedes) {
-	const sibling = precedes ? "previousSibling" : "nextSibling";
-	return (node[sibling] && trace.isMarked(node[sibling]));
+	node = precedes ? 
+		trace.findPreviousTextNode(node) :
+		trace.findNextTextNode(node);
+	if (node && trace.isMarked(node)) {
+		return node;
+	} else {
+		return null;
+	}
 };
 
 trace.markPrecedes = function(node) {
@@ -552,88 +554,86 @@ trace.markFollows = function(node) {
 	return trace._markIsAdjacent(node, false);
 };
 
-trace.markNode = function(node) {
+trace.insertNewMarkBeforeNode = function(node) {
 	let mark = document.createElement("mark");
 	mark.classList.add(trace.class.marked);
-	mark.appendChild(node.cloneNode());
 	node.parentNode.insertBefore(mark, node);
-	node.parentNode.removeChild(node);
 	return mark;
 };
 
-trace._combineAdjacentMark = function(adjMark, previous) {
-	const sibling = previous ? "previousSibling" : "nextSibling";
-	let insertFunction;
-	if (previous) { 
-		insertFunction = function(adjMark, newNode) {
-			adjMark.insertBefore(newNode, adjMark.firstChild);
-		};
-	} else {
-		insertFunction = function(adjMark, newNode) {
-			adjMark.append(newNode);
-		};
+trace.markRange = function(range) {
+	let mark = trace.insertNewMarkBeforeNode(range.startContainer);
+	let it = trace.rangedNodesIterator(range);
+	while (it.nextNode()) {
+		let node = it.referenceNode;
+		mark.appendChild(node.cloneNode());
+		node.parentNode.removeChild(node);
 	}
-
-	let newNode = adjMark[sibling].firstChild.cloneNode();
-	insertFunction(adjMark, newNode);
-	adjMark.parentNode.removeChild(adjMark[sibling]);
+	return mark;
 };
 
-trace.combinePriorMark = function(followingMark) {
-	trace._combineAdjacentMark(followingMark, true);
+trace.groupAdjacentMarks = function(node) {
+	let first = trace.markPrecedes(node) || node;
+	if (trace.isMarked(first)) {
+		first = trace.unmarkNamedSelection(first.parentNode);
+	}
+	let second = trace.markFollows(node) || node;
+	if (trace.isMarked(second)) {
+		second = trace.unmarkNamedSelection(second.parentNode);
+	}
+	let range = document.createRange();
+	range.setStart(first, 0);
+	range.setEnd(second, second.nodeValue.length);
+	return range
 };
 
-trace.combineFollowingMark = function(priorMark) {
-	trace._combineAdjacentMark(priorMark, false);
-};
-
-trace.combineMarks = function(newMark) {
-	if (trace.markPrecedes(newMark)) {
-		trace.combinePriorMark(newMark);
-	}
-	if (trace.markFollows(newMark)) {
-		trace.combineFollowingMark(newMark);
-	}
-	newMark.normalize();
-}
-
-trace.markSelections = function(sel) {
+trace.markSelection = function(sel) {
 	let range = sel.getRangeAt(0);
 	if (trace.trimWSFromRange(range)) {
 		trace.removeExcludedFromRange(range);
 		trace.spliceMarkedNodes(range);
 		if (!range.collapsed) { 
-			let it = trace.markedNodesIterator(range);
+			let it = trace.rangedNodesIterator(range);
 
 			while (it.nextNode()) {
-				let mark = trace.markNode(it.referenceNode);
-				trace.combineMarks(mark);
+				let adjRange = trace.groupAdjacentMarks(it.referenceNode);
+				let mark = trace.markRange(adjRange);
 			}
 
-			trace.element.normalize();
 			sel.empty();
 		}
 	}
 };
 
-trace.unmarkSelections = function() {
+trace.unmarkSelection = function(mark) {
+	mark.insertAdjacentText('beforebegin', mark.textContent);
+	let textNode = mark.previousSibling;
+	mark.parentNode.removeChild(mark);
+	return textNode;
+};
+
+trace.unmarkNamedSelection = function(mark) {
+	console.assert(trace.isMarked(mark.firstChild));
+	return trace.unmarkSelection(mark);
+};
+
+trace.unmarkAllSelections = function() {
 	let marked = document.getElementsByClassName(trace.class.marked);
 	while (marked.length > 0) {
-		marked[0].insertAdjacentText('beforebegin', marked[0].textContent);
-		marked[0].parentNode.removeChild(marked[0]);
-	};
-	trace.element.normalize();
+		trace.unmarkSelection(marked[0]);
+	}
 };
 
 trace.handleSelections = function() {
 	let sel = window.getSelection();
 	if (trace.element.contains(sel.anchorNode)) {
 		if (sel.toString().trim()) {
-			trace.markSelections(sel);
+			trace.markSelection(sel);
 		} else {
-			trace.unmarkSelections();
+			trace.unmarkAllSelections();
 		}
 	}
+	trace.element.normalize();
 };
 
 trace.getRangeLength = function(range) {
