@@ -412,7 +412,7 @@ trace._trimWSFromOneSideOfRange = function(range, atEnd) {
 			return trace.validRangeBoundaries(reference, newNode);
 		};
 		newPosition = function(newNode) {
-			return newNode.nodeValue.length - 1;
+			return newNode.nodeValue.length;
 		};
 		setBound = "setEnd";
 		offset = "endOffset";
