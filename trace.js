@@ -293,23 +293,39 @@ trace.validParent = function(node) {
 	return !trace.isTextNode(node) && !trace.isExcluded(node);
 };
 
-trace.findChildTextNode = function(node, first=true) {
+trace._findChildTextNode = function(node, reversed) {
+	const child = reversed ? "lastChild" : "firstChild";
 	let text = node.textContent;
 	while (trace.validParent(node) && trace.textExists(text)) {
-		node = (first ? node.firstChild : node.lastChild);
+		node = node[child];
 		text = node.textContent;
 	}
 	return node;
 };
 
-trace.findAdjacentTextNode = function(node, after=true) {
-	if (trace.isTextNode(node)) {
-		node = node.parentNode;
+trace.findFirstChildTextNode = function(node) {
+	return trace._findChildTextNode(node, false);
+};
+
+trace.findLastChildTextNode = function(node) {
+	return trace._findChildTextNode(node, true);
+};
+
+trace._findAdjacentTextNode = function(node, reversed) {
+	const sibling = reversed ? "previousSibling" : "nextSibling";
+	let findChildTextNode;
+	if (reversed) {
+		findChildTextNode = trace.findLastChildTextNode;
+	} else {
+		const sibling = "nextSibling";
+		findChildTextNode = trace.findFirstChildTextNode;
 	}
-	let nextNode = (after ? "nextSibling" : "previousSibling");
-	while (!trace.isTextNode(node)) {
-		if (node[nextNode]) {
-			node = trace.findChildTextNode(node[nextNode], after);
+
+	let moved = false;
+	while (!(trace.isTextNode(node) && moved)) {
+		moved = true;
+		if (node[sibling]) {
+			node = findChildTextNode(node[sibling]);
 		} else if (node === trace.element) {
 			return null;
 		} else {
@@ -319,52 +335,156 @@ trace.findAdjacentTextNode = function(node, after=true) {
 	return node;
 };
 
-trace.trimWSFromRange = function(range) {
-	let node = range.startContainer;
+trace.findNextTextNode = function(node) {
+	return trace._findAdjacentTextNode(node, false);
+};
+
+trace.findPreviousTextNode = function(node) {
+	return trace._findAdjacentTextNode(node, true);
+};
+
+trace._findVisibleChar = function(node, position, reversed) {
 	let text = node.textContent;
-	let offset = range.startOffset;
-	if (text && text.substring(offset)) {
-		while (offset < text.length && /^\s$/.test(text[offset])) {
-			offset++;
+	let substr = reversed ? 
+		text.substring(0, position + 1).trim() : 
+		text.substring(position).trim();
+	let iterate = reversed ? 
+		function(p) { return p - 1} :
+		function(p) { return p + 1};
+
+	if (text && substr) {
+		while (/^\s$/.test(text[position])) {
+			position = iterate(position);
 		}
-		if (offset < text.length) {
-			range.setStart(node, offset);
-		}
+		return position;
+	
 	} else {
-		node = trace.findAdjacentTextNode(node);
-		let beforeEnd = false;
-		if (node) {
-			let nodeRange = document.createRange();
-			nodeRange.selectNode(node);
-			if (nodeRange.compareBoundaryPoints(Range.END_TO_END, range) < 1) {
-				beforeEnd = true;
-			}
-		} 
-		if (!beforeEnd) {
+		return -1;
+	}
+};
+
+trace.findNextVisibleChar = function(node, position) {
+	return trace._findVisibleChar(node, position, false);
+};
+
+trace.findPreviousVisibleChar = function(node, position) {
+	return trace._findVisibleChar(node, position, true);
+};
+
+trace.createRangeOnNode = function(node) {
+	if (node) {
+		let range = document.createRange();
+		range.selectNode(node);
+		return range;
+	} else {
+		return null;
+	}
+};
+
+trace.validRangeBoundaries = function(start, end) {
+	if (!start || !end) {
+		return null;
+	}
+	if (start instanceof Node) {
+		start = trace.createRangeOnNode(start);
+	}
+	if (end instanceof Node) {
+		end = trace.createRangeOnNode(end);
+	}
+	return start.compareBoundaryPoints(Range.END_TO_START, end) < 1;
+};
+
+trace._trimWSFromOneSideOfRange = function(range, atEnd) {
+	let node = atEnd ? range.endContainer : range.startContainer;
+	let findVisibleChar, findTextNode, adjustOffset, testValidRange;
+	let setBound, offset, newPosition;
+	if (atEnd) {
+		findVisibleChar = function(node, position) {
+			return trace.findPreviousVisibleChar(node, position - 1);
+		};
+		findTextNode = function(node) {
+			return trace.findPreviousTextNode(node);
+		};
+		adjustOffset = function(position) { 
+			return position + 1; 
+		};
+		testValidRange = function(newNode, reference) {
+			return trace.validRangeBoundaries(reference, newNode);
+		};
+		newPosition = function(newNode) {
+			return newNode.nodeValue.length - 1;
+		};
+		setBound = "setEnd";
+		offset = "endOffset";
+	} else {
+		findVisibleChar = function(node, position) {
+			return trace.findNextVisibleChar(node, position);
+		};
+		findTextNode = function(node) {
+			return trace.findNextTextNode(node);
+		};
+		adjustOffset = function(position) { 
+			return position; 
+		};
+		testValidRange = function(newNode, reference) {
+			return trace.validRangeBoundaries(newNode, reference);
+		};
+		newPosition = function(newNode) {
+			return 0;
+		}
+		setBound = "setStart";
+		offset = "startOffset";
+	}
+
+	let text = node.textContent;
+	let position = findVisibleChar(node, range[offset]);
+	if (position >= 0) {
+		range[setBound](node, adjustOffset(position));
+	} else {
+		node = findTextNode(node);
+		if (trace.validRangeBoundaries(node, range)) {
+			position = findVisibleChar(node, newPosition(node));
+			range[setBound](node, adjustOffset(position));
+		} else {
 			range.collapse();
 			return false;
 		}
 	}
+	return true;
+};
+
+trace.trimWSFromLeftOfRange = function(range) {
+	return trace._trimWSFromOneSideOfRange(range, false);
+};
+
+trace.trimWSFromRightOfRange = function(range) {
+	return trace._trimWSFromOneSideOfRange(range, true);
+}
+
+trace.trimWSFromRange = function(range) {
+	return trace.trimWSFromLeftOfRange(range) &&
+		trace.trimWSFromRightOfRange(range);
+};
+
+trace._alignRangeWithTextNode = function(range, node, isEnd) {
+	const offset = isEnd ? node.textContent.length : 0;
+	const setBound = isEnd ? "setEnd" : "setStart";
+
+	if (trace.isTextNode(node)) {
+		range[setBound](node, offset);
+		return true;
+	} else {
+		range.collapse();
+		return false;
+	}
 };
 
 trace.endRangeAtEndOfTextNode = function(range, node) {
-	if (trace.isTextNode(node)) {
-		range.setEnd(node, node.textContent.length);
-		return true;
-	} else {
-		range.collapse();
-		return false;
-	}
+	return trace._alignRangeWithTextNode(range, node, true);
 };
 
 trace.startRangeAtStartOfTextNode = function(range, node) {
-	if (trace.isTextNode(node)) {
-		range.setStart(node, 0);
-		return true;
-	} else {
-		range.collapse();
-		return false;
-	}
+	return trace._alignRangeWithTextNode(range, node, false);
 };
 
 trace.removeExcludedFromRange = function(range) {
@@ -375,7 +495,7 @@ trace.removeExcludedFromRange = function(range) {
 			endNode = parent;
 			parent = endNode.parentNode;
 		}
-		endNode = trace.findAdjacentTextNode(endNode, after=false);
+		endNode = trace.findPreviousTextNode(endNode);
 		range.setEnd(endNode, endNode.textContent.length);
 	}
 };
@@ -384,7 +504,7 @@ trace.spliceMarkedNodes = function(range) {
 	let startNode = range.startContainer;
 	let endNode = range.endContainer;
 	if (trace.isMarked(endNode)) {
-		endNode = trace.findAdjacentTextNode(endNode.parentNode, after=false);
+		endNode = trace.findPreviousTextNode(endNode.parentNode);
 	} else if (range.endOffset < endNode.textContent.length) {
 		endNode = endNode.splitText(range.endOffset).previousSibling;
 	}
@@ -420,14 +540,17 @@ trace.markedNodesIterator = function(range) {
 	);
 };
 
+trace._markIsAdjacent = function(node, precedes) {
+	const sibling = precedes ? "previousSibling" : "nextSibling";
+	return (node[sibling] && trace.isMarked(node[sibling]));
+};
+
 trace.markPrecedes = function(node) {
-	let prev = node.previousSibling;
-	return (prev && trace.isMarked(prev));
+	return trace._markIsAdjacent(node, true);
 };
 
 trace.markFollows = function(node) {
-	let next = node.nextSibling;
-	return (next && trace.isMarked(next));
+	return trace._markIsAdjacent(node, false);
 };
 
 trace.markNode = function(node) {
@@ -439,20 +562,31 @@ trace.markNode = function(node) {
 	return mark;
 };
 
+trace._combineAdjacentMark = function(adjMark, previous) {
+	const sibling = previous ? "previousSibling" : "nextSibling";
+	let insertFunction;
+	if (previous) { 
+		insertFunction = function(adjMark, newNode) {
+			adjMark.insertBefore(newNode, adjMark.firstChild);
+		};
+	} else {
+		insertFunction = function(adjMark, newNode) {
+			adjMark.append(newNode);
+		};
+	}
+
+	let newNode = adjMark[sibling].firstChild.cloneNode();
+	insertFunction(adjMark, newNode);
+	adjMark.parentNode.removeChild(adjMark[sibling]);
+};
+
 trace.combinePriorMark = function(followingMark) {
-	let mark = followingMark.previousSibling;
-	let newNode = mark.firstChild.cloneNode();
-	let reference = followingMark.firstChild;
-	followingMark.insertBefore(newNode, reference);
-	followingMark.parentNode.removeChild(mark);
+	trace._combineAdjacentMark(followingMark, true);
 };
 
 trace.combineFollowingMark = function(priorMark) {
-	let mark = priorMark.nextSibling;
-	let newNode = mark.firstChild.cloneNode();
-	priorMark.appendChild(newNode);
-	priorMark.parentNode.removeChild(mark);
-}
+	trace._combineAdjacentMark(priorMark, false);
+};
 
 trace.combineMarks = function(newMark) {
 	if (trace.markPrecedes(newMark)) {
@@ -466,19 +600,20 @@ trace.combineMarks = function(newMark) {
 
 trace.markSelections = function(sel) {
 	let range = sel.getRangeAt(0);
-	// should trim whitespace
-	trace.removeExcludedFromRange(range);
-	trace.spliceMarkedNodes(range);
-	if (!range.collapsed) { 
-		let it = trace.markedNodesIterator(range);
+	if (trace.trimWSFromRange(range)) {
+		trace.removeExcludedFromRange(range);
+		trace.spliceMarkedNodes(range);
+		if (!range.collapsed) { 
+			let it = trace.markedNodesIterator(range);
 
-		while (it.nextNode()) {
-			let mark = trace.markNode(it.referenceNode);
-			trace.combineMarks(mark);
+			while (it.nextNode()) {
+				let mark = trace.markNode(it.referenceNode);
+				trace.combineMarks(mark);
+			}
+
+			trace.element.normalize();
+			sel.empty();
 		}
-
-		trace.element.normalize();
-		sel.empty();
 	}
 };
 
