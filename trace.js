@@ -317,12 +317,11 @@ trace._findAdjacentTextNode = function(node, reversed) {
 	if (reversed) {
 		findChildTextNode = trace.findLastChildTextNode;
 	} else {
-		const sibling = "nextSibling";
 		findChildTextNode = trace.findFirstChildTextNode;
 	}
 
 	let moved = false;
-	while (!(trace.isTextNode(node) && moved)) {
+	while (!(trace.isTextNode(node) && node.textContent.trim() && moved)) {
 		moved = true;
 		if (node[sibling]) {
 			node = findChildTextNode(node[sibling]);
