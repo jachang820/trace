@@ -18,109 +18,11 @@ trace.assets = {};
 trace.SVGNS = "http://www.w3.org/2000/svg";
 trace.state = "off";
 
-trace.assets.outerGlowFilter = (function() {
-	let filter = document.createElementNS(trace.SVGNS, "filter");
-	filter.id = "outer-glow";
-	filter.height = "200%";
-	filter.width = "200%";
-
-	let morph = document.createElementNS(trace.SVGNS, "feMorphology");
-	morph.setAttribute("operator", "dilate");
-	morph.setAttribute("radius", "1");
-	morph.setAttribute("in", "SourceAlpha");
-	morph.setAttribute("result", "thicken");
-	filter.appendChild(morph);
-
-	let gaussian = document.createElementNS(trace.SVGNS, "feGaussianBlur");
-	gaussian.setAttribute("in", "thicken");
-	gaussian.setAttribute("stdDeviation", "2");
-	gaussian.setAttribute("result", "blurred");
-	filter.appendChild(gaussian);
-
-	let flood = document.createElementNS(trace.SVGNS, "feFlood");
-	flood.setAttribute("flood-color", "rgb(255,204,0)");
-	flood.setAttribute("result", "glowColor");
-	filter.appendChild(flood);
-
-	let composite = document.createElementNS(trace.SVGNS, "feComposite");
-	composite.setAttribute("in", "glowColor");
-	composite.setAttribute("in2", "blurred");
-	composite.setAttribute("operator", "in");
-	composite.setAttribute("result", "coloredGlow");
-	filter.appendChild(composite);
-
-	let merge = document.createElementNS(trace.SVGNS, "feMerge");
-	let mergeNode = document.createElementNS(trace.SVGNS, "feMergeNode");
-	mergeNode.setAttribute("in", "coloredGlow");
-	merge.appendChild(mergeNode);
-
-	mergeNode = document.createElementNS(trace.SVGNS, "feMergeNode");
-	mergeNode.setAttribute("in", "SourceGraphic");
-	merge.appendChild(mergeNode);
-	filter.appendChild(merge);
-	return filter;
-})();
-
-trace.assets.switchLabel = (function() {
-	let svg = document.createElementNS(trace.SVGNS, "svg");
-	svg.setAttribute("viewBox", "0 0 408 137");
-	svg.setAttribute("fill-rule", "evenodd");
-	svg.id = trace.class.switchLabel;
-	let group = document.createElementNS(trace.SVGNS, "g");
-	
-	let path = document.createElementNS(trace.SVGNS, "path");
-	path.setAttribute("d", 
-		"M 15.2 0L 15.2 28.8L 0.8 28.8L 0.8 43.2L 15.2 43.2L 15.2 104C 15.2147 113.166 17.8348 126.21 25.6834 132.067C 34.3171 138.51 48.2862 136 58.4 136L 58.4 121.6C 51.382 121.595 43.5151 120.876 39.3179 114.368C 35.3398 108.199 36.8 98.9736 36.8 92L 36.8 43.2L 53.6 43.2L 53.6 28.8L 36.8 28.8L 36.8 0L 15.2 0z");
-	group.appendChild(path);
-	
-	path = document.createElementNS(trace.SVGNS, "path");
-	path.setAttribute("d",
-		"M 68 30.4L 68 136L 90.4 136C 90.4 100.909 92.4824 65.107 88 30.4L 68 30.4z");
-	group.appendChild(path);
-	
-	path = document.createElementNS(trace.SVGNS, "path");
-	path.setAttribute("d",
-		"M 99.2 52.8C 109.012 50.8972 117.312 50.7503 127.2 52L 127.2 29.6C 120.338 29.6 104.358 28.7925 100.022 35.5148C 97.5 39.4252 99.2 48.2521 99.2 52.8z");
-	group.appendChild(path);
-	
-	path = document.createElementNS(trace.SVGNS, "path");
-	path.setAttribute("d",
-		"M 162.4 136L 162.4 121.6C 148.382 120.155 145.324 101.984 152.631 92.012C 158.376 84.1736 168.036 84 176.8 84L 176.8 71.2C 162.226 71.2 145.731 72.6856 135.735 84.8312C 125.433 97.3496 125.815 119.55 139.203 129.977C 145.959 135.238 154.182 136 162.4 136z");
-	group.appendChild(path);
-
-	path = document.createElementNS(trace.SVGNS, "path");
-	path.setAttribute("d",
-		"M 144 52C 153.85 46.5382 170.121 37.8478 180.714 46.8266C 185.31 50.7226 185.591 57.6145 185.6 63.2C 185.623 77.6074 188.843 96.4536 185.346 110.4C 183.566 117.498 175.604 117.319 172.022 122.159C 169.998 124.895 171.2 131.137 171.2 134.4C 178.521 132.702 186.31 128.656 189.6 121.6L 192 121.6C 194.959 131.585 208.669 141.235 212.401 126.4C 213.594 121.656 208.152 112.913 208.012 107.2C 207.524 87.3016 212.955 58.1064 200.876 40.8031C 190.706 26.2346 168.711 27.2112 153.6 31.542C 149.383 32.7506 139.306 35.1751 137.958 40.0747C 137.01 43.5192 142.19 49.2634 144 52z");
-	group.appendChild(path);
-
-	path = document.createElementNS(trace.SVGNS, "path");
-	path.setAttribute("d",
-		"M 264 136L 264 118.4C 240.886 112.907 238.341 76.5217 248.372 59.2C 250.53 55.473 253.178 52.0811 256.801 49.6864C 258.813 48.356 262.396 47.5649 263.518 45.2654C 265.438 41.3264 264 33.9407 264 29.6C 205.475 30.8079 205.818 133.495 264 136M 272.8 29.6L 272.8 46.4C 280.567 46.7386 287.115 50.0143 292.8 55.2C 295.716 53.1024 301.914 48.0838 301.459 44.0031C 300.378 34.2922 280.41 29.663 272.8 29.6z");
-	group.appendChild(path);
-
-	path = document.createElementNS(trace.SVGNS, "path");
-	path.setAttribute("d",
-		"M 272.8 118.4L 272.8 136C 282.005 135.604 291.306 131.806 297.481 124.769C 300.728 121.068 297.986 112.019 292.653 111.125C 290.03 110.685 286.97 113.665 284.8 114.806C 281.041 116.782 276.93 117.598 272.8 118.4z");
-	group.appendChild(path);
-
-	path = document.createElementNS(trace.SVGNS, "path");
-	path.setAttribute("d",
-		"M 381.6 109.6L 380.8 109.6C 365.751 122.394 341.184 122.126 330.475 104C 325.245 95.1456 324.908 82.6176 326.933 72.8C 328.57 64.8622 331.857 57.126 337.829 51.4605C 340.466 48.9586 346.783 47.5974 348.318 44.4648C 350.242 40.5352 348.8 33.1338 348.8 28.8C 332.515 29.51 318.798 42.0192 311.807 56C 298.098 83.42 308.422 121.738 338.4 133.258C 350.69 137.98 367.018 137.373 378.4 130.458C 381.574 128.53 388.342 124.332 387.984 120C 387.69 116.44 383.694 112.324 381.6 109.6M 358.4 28.8L 358.4 45.6C 372.293 47.6824 380.764 61.2014 380.8 74.4L 336.8 74.4L 336.8 89.6L 401.6 89.6C 401.6 62.1826 390.362 31.4107 358.4 28.8z");
-	group.appendChild(path);
-	svg.appendChild(group);
-
-	let def = document.createElementNS(trace.SVGNS, "def");
-	def.appendChild(trace.assets.outerGlowFilter);
-	svg.appendChild(def);
-
-	return svg;
-})();
-
 trace.assets.switchButton = (function() {
 	let button = document.createElement("button");
-	button.id = trace.class.switchOff;
+	button.classList.add(trace.class.switchOff);
 	button.type = "button";
-	button.appendChild(trace.assets.switchLabel);
+	button.textContent = "TRACE";
 	return button;
 })();
 
@@ -176,7 +78,7 @@ document.head.appendChild((function() {
 				padding-left: ${trace.defaults.paddingLeft};
 				padding-right: ${trace.defaults.paddingRight};
 			}
-			90% {
+			70% {
 				padding-left: ${trace.defaults.paddingLeft};
 				padding-right: ${trace.defaults.paddingRight};
 			}
@@ -191,7 +93,7 @@ document.head.appendChild((function() {
 			padding-bottom: ${padBottom}px;
 			padding-left: ${padLeft}px;
 			padding-right: ${padRight}px;
-			animation: text-vertical 2s, pad-sides 2.2s;
+			animation: text-vertical 2s, pad-sides 1.4s;
 		}
 
 		#${trace.ids.switch} {
@@ -206,31 +108,43 @@ document.head.appendChild((function() {
 			font-size: 10pt;
 		}
 
-		#${trace.class.switchLabel} {
+		.${trace.class.switchLabel} {
 			height: 25px;
 			fill: #838383;
 		}
 
-		#${trace.class.switchLabel}:hover {
+		.${trace.class.switchLabel}:hover {
 			filter: url(#outer-glow);
 		}
 
-		#${trace.class.switchLabelOn} {
+		.${trace.class.switchLabelOn} {
 			height: 25px;
 			fill: #838383;
 			filter: url(#outer-flow);
 		}
 
-		#${trace.class.switchOff} {
+		.${trace.class.switchOff} {
+			height: 30px;
+			width: 75px;
 			padding: 2px;
 			margin: 0px;
 			border: 1px solid black;
+			border-radius: 15px;
+			background-color: lightgrey;
+			font-size: 20px;
+			font-weight: 900;
 		}
 
-		#${trace.class.switchOn} {
+		.${trace.class.switchOn} {
+			height: 30px;
+			width: 75px;
 			padding: 2px;
 			margin: 0px;
 			border: 1px solid black;
+			border-radius: 15px;
+			background-color: orange;
+			font-size: 20px;
+			font-weight: 900;
 		}
 
 		.${trace.class.marked} {
@@ -650,8 +564,6 @@ trace.getRangeOffset = function(range) {
 trace.on = function() {
 	trace.assets.switchButton.classList.remove(trace.class.switchOff);
 	trace.assets.switchButton.classList.add(trace.class.switchOn);
-	trace.assets.switchLabel.classList.remove(trace.class.switchLabel);
-	trace.assets.switchLabel.classList.add(trace.class.switchLabelOn);
 	trace.element.classList.add(trace.class.on);
 	trace.element.addEventListener("mouseup", trace.handleSelections);
 	trace.state = "on";
@@ -660,8 +572,6 @@ trace.on = function() {
 trace.off = function() {
 	trace.assets.switchButton.classList.remove(trace.class.switchOn);
 	trace.assets.switchButton.classList.add(trace.class.switchOff);
-	trace.assets.switchLabel.classList.remove(trace.class.switchLabelOn);
-	trace.assets.switchLabel.classList.add(trace.class.switchLabel);
 	trace.element.classList.remove(trace.class.on);
 	trace.element.removeEventListener("mouseup", trace.handleSelections);
 	trace.state = "off";
